@@ -1,0 +1,13 @@
+version: '3.9'
+
+services:
+  sayin:
+    image: htetlinmaung/sayin
+    build: .
+    ports:
+      - "4040:4040"
+    environment:
+      - PORT=4040
+      - MONGODB_URI=mongodb://150.95.82.125:27018/sayin
+      - JWT_SECRET=secret
+  
