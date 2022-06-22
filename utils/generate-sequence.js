@@ -1,9 +1,9 @@
 const Sequence = require("../models/Sequence");
 
 const prefixChar = (str, c, length) => {
-  let newstr = str;
+  let newstr = str + "";
   while (newstr.length < length) {
-    newstr = c + newc;
+    newstr = c + newstr;
   }
   return newstr;
 };

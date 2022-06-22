@@ -39,4 +39,6 @@ const invoiceSchema = new Schema(
   { timestamps: true }
 );
 
+invoiceSchema.index({ "$**": "text" });
+
 module.exports = model("Invoice", invoiceSchema);

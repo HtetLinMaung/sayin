@@ -4,6 +4,7 @@ const generateSequence = require("../utils/generate-sequence");
 const money = require("mm-money");
 const Sale = require("../models/Sale");
 const Invoice = require("../models/Invoice");
+const Product = require("../models/Product");
 
 const router = express.Router();
 
@@ -13,34 +14,33 @@ router
     try {
       const { items, paymentmethod } = req.body;
 
-      const total = money.default.parseNumber(
-        money.default.sum(
-          items.map(
-            (item) => money.default.parseNumber(item.price) * item.quantity
-          )
-        )
-      );
       const invoiceid = await generateSequence("invoiceid");
       const invoice = new Invoice({
         invoiceid,
-        subtotal: total,
-        total,
+        subtotal: 0,
+        total: 0,
         createdby: req.tokenData.id,
         paymentmethod,
       });
       await invoice.save();
 
       for (const item of items) {
+        const product = await Product.findById(item.product);
+        const subtotal = product.price * item.qty;
+        invoice.subtotal += subtotal;
+
         const sale = new Sale({
           invoice: invoice._id,
           product: item.product,
-          price: item.price,
-          qty: item.quantity,
-          amount: money.default.parseNumber(item.price) * item.quantity,
+          price: product.price,
+          qty: item.qty,
+          amount: subtotal,
           createdby: req.tokenData.id,
         });
-        await sale.save();
+        sale.save();
       }
+      invoice.total = invoice.subtotal;
+      await invoice.save();
 
       res.status(201).json({
         code: 201,

@@ -37,4 +37,6 @@ const saleSchema = new Schema(
   { timestamps: true }
 );
 
+saleSchema.index({ "$**": "text" });
+
 module.exports = model("Sale", saleSchema);
