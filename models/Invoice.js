@@ -1,8 +1,8 @@
 const { Schema, model } = require("mongoose");
 
-const voucherSchema = new Schema(
+const invoiceSchema = new Schema(
   {
-    voucherno: {
+    invoiceid: {
       type: String,
       required: true,
     },
@@ -10,29 +10,33 @@ const voucherSchema = new Schema(
       type: Number,
       default: 0,
     },
+    discount: {
+      type: Number,
+      default: 0,
+    },
+    subtotal: {
+      type: Number,
+      default: 0,
+    },
     total: {
       type: Number,
       default: 0,
     },
-    customername: {
+    paymentmethod: {
       type: String,
-      default: "",
+      default: "Cash",
     },
-    remark: {
-      type: String,
-      default: "",
+    status: {
+      type: Number,
+      default: 1,
     },
     createdby: {
       type: Schema.Types.ObjectId,
       required: true,
       ref: "User",
     },
-    status: {
-      type: Number,
-      default: 1,
-    },
   },
   { timestamps: true }
 );
 
-module.exports = model("Voucher", voucherSchema);
+module.exports = model("Invoice", invoiceSchema);

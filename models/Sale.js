@@ -1,11 +1,11 @@
 const { Schema, model } = require("mongoose");
 
-const orderDetailSchema = new Schema(
+const saleSchema = new Schema(
   {
-    order: {
+    invoice: {
       type: Schema.Types.ObjectId,
       required: true,
-      ref: "Order",
+      ref: "Invoice",
     },
     product: {
       type: Schema.Types.ObjectId,
@@ -37,4 +37,4 @@ const orderDetailSchema = new Schema(
   { timestamps: true }
 );
 
-module.exports = model("OrderDetail", orderDetailSchema);
+module.exports = model("Sale", saleSchema);
