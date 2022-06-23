@@ -12,5 +12,5 @@ services:
       - JWT_SECRET=secret
       - TZ=Asia/Yangon
     volumes:
-      - /app/public:/app/public
+      - /app/sayin/public:/app/public
   
