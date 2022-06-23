@@ -5,8 +5,104 @@ const money = require("mm-money");
 const Sale = require("../models/Sale");
 const Invoice = require("../models/Invoice");
 const Product = require("../models/Product");
+const jwt = require("jsonwebtoken");
+const ExcelJS = require("exceljs");
+const fs = require("fs");
+const path = require("path");
+const moment = require("moment");
+const mongoose = require("mongoose");
 
 const router = express.Router();
+
+router.get("/export", async (req, res) => {
+  try {
+    const { search, token, fromdate, todate } = req.query;
+
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decodedToken) {
+      return res.status(401).json({
+        code: 401,
+        message: "Not authenticated!",
+      });
+    }
+
+    const query = {
+      status: 1,
+      createdby: decodedToken.id,
+    };
+
+    if (search) {
+      query["$text"] = {
+        $search: search,
+      };
+    }
+
+    if (fromdate && !todate) {
+      query["createdAt"] = {
+        $gte: moment(fromdate).toDate(),
+      };
+    } else if (fromdate && todate) {
+      query["createdAt"] = {
+        $gte: moment(fromdate).toDate(),
+        $lt: moment(todate).add(1, "days").toDate(),
+      };
+    } else if (todate && !fromdate) {
+      query["createdAt"] = {
+        $lt: moment(todate).add(1, "days").toDate(),
+      };
+    }
+
+    const invoices = await Invoice.find(query)
+      .sort({ createdAt: "desc" })
+      .populate("createdby");
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Invoice");
+    ws.addRows([
+      [
+        "Invoice ID",
+        "Discount",
+        "Tax",
+        "Subtotal",
+        "Total",
+        "Payment Method",
+        "Time",
+        "Creater",
+      ],
+      ...invoices.map((i) => [
+        i.invoiceid,
+        i.discount,
+        i.tax,
+        i.subtotal,
+        i.total,
+        i.paymentmethod,
+        i.createdAt,
+        i.createdby.name,
+      ]),
+    ]);
+    const folderPath = path.join(__dirname, "..", "excels", decodedToken.id);
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath);
+    }
+    const filePath = path.join(
+      folderPath,
+      `invoices_${new Date().toISOString()}.xlsx`
+    );
+    await wb.xlsx.writeFile(filePath);
+    res.download(filePath, (err) => {
+      if (err) {
+        console.log(err);
+      }
+      fs.unlinkSync(filePath);
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      code: 500,
+      message: err.message,
+    });
+  }
+});
 
 router
   .route("/")
@@ -56,16 +152,31 @@ router
   })
   .get(isAuth, async (req, res) => {
     try {
-      const { search, page, perpage } = req.query;
+      const { search, page, perpage, fromdate, todate } = req.query;
 
       const query = {
         status: 1,
-        createdby: req.tokenData.id,
+        createdby: new mongoose.Types.ObjectId(req.tokenData.id),
       };
 
       if (search) {
         query["$text"] = {
           $search: search,
+        };
+      }
+
+      if (fromdate && !todate) {
+        query["createdAt"] = {
+          $gte: moment(fromdate).toDate(),
+        };
+      } else if (fromdate && todate) {
+        query["createdAt"] = {
+          $gte: moment(fromdate).toDate(),
+          $lt: moment(todate).add(1, "days").toDate(),
+        };
+      } else if (todate && !fromdate) {
+        query["createdAt"] = {
+          $lt: moment(todate).add(1, "days").toDate(),
         };
       }
 
@@ -77,6 +188,17 @@ router
         .limit(perpage);
 
       const total = await Invoice.find(query).countDocuments();
+      const aggregate = await Invoice.aggregate([
+        {
+          $match: query,
+        },
+        {
+          $group: {
+            _id: null,
+            grandtotal: { $sum: "$total" },
+          },
+        },
+      ]);
 
       res.json({
         code: 200,
@@ -86,6 +208,9 @@ router
         page: parseInt(page),
         perpage: parseInt(perpage),
         pagecount: Math.ceil(total / perpage),
+        grandtotal: aggregate.length
+          ? money.default.format(aggregate[0].grandtotal)
+          : "0.00",
       });
     } catch (err) {
       console.log(err);

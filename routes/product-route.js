@@ -3,6 +3,7 @@ const ExcelJS = require("exceljs");
 const fs = require("fs");
 const path = require("path");
 const jwt = require("jsonwebtoken");
+const moment = require("moment");
 
 const isAuth = require("../middlewares/is-auth");
 const Product = require("../models/Product");
@@ -62,7 +63,7 @@ router
   })
   .get(isAuth, async (req, res) => {
     try {
-      const { search, page, perpage } = req.query;
+      const { search, page, perpage, fromdate, todate } = req.query;
 
       const query = {
         status: 1,
@@ -72,6 +73,21 @@ router
       if (search) {
         query["$text"] = {
           $search: search,
+        };
+      }
+
+      if (fromdate && !todate) {
+        query["createdAt"] = {
+          $gte: moment(fromdate).toDate(),
+        };
+      } else if (fromdate && todate) {
+        query["createdAt"] = {
+          $gte: moment(fromdate).toDate(),
+          $lt: moment(todate).add(1, "days").toDate(),
+        };
+      } else if (todate && !fromdate) {
+        query["createdAt"] = {
+          $lt: moment(todate).add(1, "days").toDate(),
         };
       }
 
@@ -104,7 +120,7 @@ router
 
 router.get("/export", async (req, res) => {
   try {
-    const { search, token } = req.query;
+    const { search, token, fromdate, todate } = req.query;
 
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
     if (!decodedToken) {
@@ -125,13 +141,38 @@ router.get("/export", async (req, res) => {
       };
     }
 
-    const products = await Product.find(query);
+    if (fromdate && !todate) {
+      query["createdAt"] = {
+        $gte: moment(fromdate).toDate(),
+      };
+    } else if (fromdate && todate) {
+      query["createdAt"] = {
+        $gte: moment(fromdate).toDate(),
+        $lt: moment(todate).add(1, "days").toDate(),
+      };
+    } else if (todate && !fromdate) {
+      query["createdAt"] = {
+        $lt: moment(todate).add(1, "days").toDate(),
+      };
+    }
+
+    const products = await Product.find(query)
+      .sort({ createdAt: "desc" })
+      .populate("createdby");
 
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Product");
     ws.addRows([
-      ["Code", "Name", "Price", "Description", "Image"],
-      ...products.map((p) => [p.code, p.name, p.price, p.description, p.image]),
+      ["Code", "Name", "Price", "Description", "Image", "Time", "Creater"],
+      ...products.map((p) => [
+        p.code,
+        p.name,
+        p.price,
+        p.description,
+        p.image,
+        p.createdAt,
+        p.createdby.name,
+      ]),
     ]);
     const folderPath = path.join(__dirname, "..", "excels", decodedToken.id);
     if (!fs.existsSync(folderPath)) {
