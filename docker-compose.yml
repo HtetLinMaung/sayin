@@ -11,4 +11,6 @@ services:
       - MONGODB_URI=mongodb://150.95.82.125:27018/sayin
       - JWT_SECRET=secret
       - TZ=Asia/Yangon
+    volumes:
+      - /app/public:/app/public
   

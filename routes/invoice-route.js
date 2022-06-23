@@ -108,7 +108,7 @@ router
   .route("/")
   .post(isAuth, async (req, res) => {
     try {
-      const { items, paymentmethod } = req.body;
+      const { items, paymentmethod, tax, discount } = req.body;
 
       const invoiceid = await generateSequence("invoiceid");
       const invoice = new Invoice({
@@ -116,6 +116,8 @@ router
         subtotal: 0,
         total: 0,
         createdby: req.tokenData.id,
+        tax,
+        discount,
         paymentmethod,
       });
       await invoice.save();
@@ -135,7 +137,13 @@ router
         });
         sale.save();
       }
-      invoice.total = invoice.subtotal;
+      invoice.total = money.default.parseNumber(
+        money.default.sum([
+          invoice.subtotal,
+          invoice.tax,
+          `-${invoice.discount}`,
+        ])
+      );
       await invoice.save();
 
       res.status(201).json({

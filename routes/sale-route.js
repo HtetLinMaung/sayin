@@ -219,7 +219,9 @@ router.post("/import", isAuth, async (req, res) => {
         }
       }
     }
-    invoice.total = invoice.subtotal;
+    invoice.total = money.default.parseNumber(
+      money.default.sum([invoice.subtotal, invoice.tax, `-${invoice.discount}`])
+    );
     await invoice.save();
     res.json({
       code: 200,
