@@ -16,7 +16,7 @@ const router = express.Router();
 
 router.get("/export", async (req, res) => {
   try {
-    const { search, token, fromdate, todate } = req.query;
+    const { search, token, fromdate, todate, sort } = req.query;
 
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
     if (!decodedToken) {
@@ -52,8 +52,16 @@ router.get("/export", async (req, res) => {
       };
     }
 
+    const sortArg = {};
+    if (sort) {
+      for (const item of sort.split(",")) {
+        const [key, value] = item.split(":");
+        sortArg[key] = value;
+      }
+    }
+
     const invoices = await Invoice.find(query)
-      .sort({ createdAt: "desc" })
+      .sort(sortArg)
       .populate("createdby");
 
     const wb = new ExcelJS.Workbook();
@@ -64,7 +72,7 @@ router.get("/export", async (req, res) => {
         "Discount",
         "Tax",
         "Subtotal",
-        "Total",
+        "Nett",
         "Payment Method",
         "Time",
         "Creater",
@@ -160,7 +168,7 @@ router
   })
   .get(isAuth, async (req, res) => {
     try {
-      const { search, page, perpage, fromdate, todate } = req.query;
+      const { search, page, perpage, fromdate, todate, sort } = req.query;
 
       const query = {
         status: 1,
@@ -188,10 +196,18 @@ router
         };
       }
 
+      const sortArg = {};
+      if (sort) {
+        for (const item of sort.split(",")) {
+          const [key, value] = item.split(":");
+          sortArg[key] = value;
+        }
+      }
+
       const offset = (parseInt(page) - 1) * parseInt(perpage);
 
       const data = await Invoice.find(query)
-        .sort({ createdAt: "desc" })
+        .sort(sortArg)
         .skip(offset)
         .limit(perpage);
 

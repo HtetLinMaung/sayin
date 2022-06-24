@@ -15,7 +15,7 @@ const moment = require("moment");
 
 router.get("/export", async (req, res) => {
   try {
-    const { search, token, invoiceid } = req.query;
+    const { search, token, invoiceid, sort, fromdate, todate } = req.query;
 
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
     if (!decodedToken) {
@@ -104,8 +104,16 @@ router.get("/export", async (req, res) => {
       };
     }
 
+    const sortArg = {};
+    if (sort) {
+      for (const item of sort.split(",")) {
+        const [key, value] = item.split(":");
+        sortArg[key] = value;
+      }
+    }
+
     const sales = await Sale.find(query)
-      .sort({ createdAt: "desc" })
+      .sort(sortArg)
       .populate(["createdby", "invoice", "product"]);
 
     const wb = new ExcelJS.Workbook();
@@ -239,7 +247,8 @@ router.post("/import", isAuth, async (req, res) => {
 
 router.route("/").get(isAuth, async (req, res) => {
   try {
-    const { search, page, perpage, invoiceid, fromdate, todate } = req.query;
+    const { search, page, perpage, invoiceid, fromdate, todate, sort } =
+      req.query;
 
     const query = {
       status: 1,
@@ -320,10 +329,18 @@ router.route("/").get(isAuth, async (req, res) => {
       };
     }
 
+    const sortArg = {};
+    if (sort) {
+      for (const item of sort.split(",")) {
+        const [key, value] = item.split(":");
+        sortArg[key] = value;
+      }
+    }
+
     const offset = (parseInt(page) - 1) * parseInt(perpage);
 
     const data = await Sale.find(query)
-      .sort({ createdAt: "desc" })
+      .sort(sortArg)
       .skip(offset)
       .limit(perpage)
       .populate(["product", "invoice"]);
