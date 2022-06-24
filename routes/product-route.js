@@ -179,13 +179,27 @@ router.get("/export", async (req, res) => {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Product");
     ws.addRows([
-      ["Code", "Name", "Price", "Description", "Image", "Time", "Creater"],
+      [
+        "Code",
+        "Name",
+        "Price",
+        "Description",
+        "Image",
+        "Discount Percentage",
+        "In Stock",
+        "Reorder Level",
+        "Time",
+        "Creater",
+      ],
       ...products.map((p) => [
         p.code,
         p.name,
         p.price,
         p.description,
         p.image,
+        p.discountpercent,
+        p.instock,
+        p.reorderlevel,
         p.createdAt,
         p.createdby.name,
       ]),
@@ -386,7 +400,10 @@ router.post("/import", isAuth, async (req, res) => {
         !row.getCell(2).value &&
         !row.getCell(3).value &&
         !row.getCell(4).value &&
-        !row.getCell(5).value
+        !row.getCell(5).value &&
+        !row.getCell(6).value &&
+        !row.getCell(7).value &&
+        !row.getCell(8).value
       ) {
         break;
       }
@@ -400,6 +417,9 @@ router.post("/import", isAuth, async (req, res) => {
         product.price = parseFloat(row.getCell(3).value);
         product.description = row.getCell(4).value;
         product.image = row.getCell(5).value;
+        product.discountpercent = parseFloat(row.getCell(6).value);
+        product.instock = row.getCell(7).value;
+        product.reorderlevel = row.getCell(8).value;
       } else {
         product = new Product({
           code: row.getCell(1).value,
@@ -408,6 +428,9 @@ router.post("/import", isAuth, async (req, res) => {
           description: row.getCell(4).value,
           image: row.getCell(5).value,
           createdby: req.tokenData.id,
+          discountpercent: parseFloat(row.getCell(6).value),
+          instock: row.getCell(7).value,
+          reorderlevel: row.getCell(8).value,
         });
       }
 
@@ -418,6 +441,9 @@ router.post("/import", isAuth, async (req, res) => {
         description: row.getCell(4).value,
         image: row.getCell(5).value,
         updatedby: req.tokenData.id,
+        discountpercent: parseFloat(row.getCell(6).value),
+        instock: row.getCell(7).value,
+        reorderlevel: row.getCell(8).value,
       });
       try {
         await product.save();

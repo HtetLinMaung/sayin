@@ -22,6 +22,18 @@ const productHistorySchema = new Schema(
       type: String,
       default: "",
     },
+    instock: {
+      type: Number,
+      default: 0,
+    },
+    discountpercent: {
+      type: Number,
+      default: 0,
+    },
+    reorderlevel: {
+      type: Number,
+      default: 0,
+    },
     status: {
       type: Number,
       default: 1,
