@@ -135,7 +135,7 @@ router
           {
             _id: item.product,
             status: 1,
-            instock: { $gte: item.quantity },
+            instock: { $gte: item.qty },
           },
           {
             $inc: {

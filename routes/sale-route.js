@@ -203,7 +203,7 @@ router.post("/import", isAuth, async (req, res) => {
         {
           code: row.getCell(1).value,
           status: 1,
-          instock: { $gte: item.quantity },
+          instock: { $gte: item.qty },
         },
         {
           $inc: {
