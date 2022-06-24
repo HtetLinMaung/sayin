@@ -198,22 +198,29 @@ router.post("/import", isAuth, async (req, res) => {
       if (!row.getCell(1).value && !row.getCell(2).value) {
         break;
       }
-      const product = await Product.findOne(
+
+      const product = await Product.findOneAndUpdate(
         {
-          status: 1,
           code: row.getCell(1).value,
-          createdby: req.tokenData.id,
+          status: 1,
+          instock: { $gte: item.quantity },
         },
-        { _id: 1, price: 1 }
+        {
+          $inc: {
+            instock: -row.getCell(2).value,
+          },
+        }
       );
       if (product) {
-        const subtotal = row.getCell(2).value * product.price;
+        const price =
+          product.price - product.price * (product.discountpercent / 100);
+        const subtotal = row.getCell(2).value * price;
         invoice.subtotal += subtotal;
 
         const sale = new Sale({
           product: product._id,
           qty: row.getCell(2).value,
-          price: product.price,
+          price,
           amount: subtotal,
           createdby: req.tokenData.id,
           invoice: invoice._id,

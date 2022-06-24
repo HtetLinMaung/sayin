@@ -131,19 +131,34 @@ router
       await invoice.save();
 
       for (const item of items) {
-        const product = await Product.findById(item.product);
-        const subtotal = product.price * item.qty;
-        invoice.subtotal += subtotal;
+        const product = await Product.findOneAndUpdate(
+          {
+            _id: item.product,
+            status: 1,
+            instock: { $gte: item.quantity },
+          },
+          {
+            $inc: {
+              instock: -item.qty,
+            },
+          }
+        );
+        if (product) {
+          const price =
+            product.price - product.price * (product.discountpercent / 100);
+          const subtotal = price * item.qty;
+          invoice.subtotal += subtotal;
 
-        const sale = new Sale({
-          invoice: invoice._id,
-          product: item.product,
-          price: product.price,
-          qty: item.qty,
-          amount: subtotal,
-          createdby: req.tokenData.id,
-        });
-        sale.save();
+          const sale = new Sale({
+            invoice: invoice._id,
+            product: item.product,
+            price,
+            qty: item.qty,
+            amount: subtotal,
+            createdby: req.tokenData.id,
+          });
+          sale.save();
+        }
       }
       invoice.total = money.default.parseNumber(
         money.default.sum([
