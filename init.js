@@ -1,6 +1,8 @@
 const bcrypt = require("bcryptjs");
 const fs = require("fs");
+const Category = require("./models/Category");
 const Module = require("./models/Module");
+const Product = require("./models/Product");
 const Role = require("./models/Role");
 const Sequence = require("./models/Sequence");
 
@@ -56,6 +58,19 @@ const init = async () => {
   }
   user.role = role._id;
   await user.save();
+
+  // const categories = await Category.find({ status: 1 });
+  // for (const category of categories) {
+  //   const productIds = [];
+  //   for (const productId of category.products) {
+  //     const product = await Product.findById(productId);
+  //     if (product && product.status) {
+  //       productIds.push(productId);
+  //     }
+  //   }
+  //   category.products = productIds;
+  //   await category.save();
+  // }
 
   let sequence = await Sequence.findOne({
     key: "invoiceid",

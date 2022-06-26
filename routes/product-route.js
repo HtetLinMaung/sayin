@@ -368,7 +368,9 @@ router
   .delete(isAuth, getProductById, async (req, res) => {
     try {
       const product = req.data;
+      let createdby = null;
       if (!req.role.superadmin) {
+        createdby = getCreatedByCondition(req);
         const accessable = await isModuleAccessable("Product", "d", req);
         if (
           !accessable ||
@@ -378,6 +380,23 @@ router
             code: 403,
             message: "You are not authorized to perform this action",
           });
+        }
+      }
+
+      for (const categoryId of product.categories) {
+        const query = {
+          _id: categoryId,
+          status: 1,
+        };
+        if (createdby) {
+          query["createdby"] = createdby;
+        }
+        const category = await Category.findOne(query);
+        if (category) {
+          category.products = category.products.filter(
+            (id) => id != product._id
+          );
+          await category.save();
         }
       }
 
