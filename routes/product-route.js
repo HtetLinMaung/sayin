@@ -299,8 +299,12 @@ router
           query["createdby"] = createdby;
         }
         const category = await Category.findOne(query);
-        category.products = category.products.filter((id) => id != product._id);
-        await category.save();
+        if (category) {
+          category.products = category.products.filter(
+            (id) => id != product._id
+          );
+          await category.save();
+        }
       }
 
       if (req.body.image.startsWith("data:image")) {
@@ -340,8 +344,10 @@ router
           query["createdby"] = createdby;
         }
         const category = await Category.findOne(query);
-        category.products.push(product._id);
-        await category.save();
+        if (category) {
+          category.products.push(product._id);
+          await category.save();
+        }
       }
 
       res.json({
