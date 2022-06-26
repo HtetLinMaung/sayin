@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const jwt = require("jsonwebtoken");
 const moment = require("moment");
-
+const socketio = require("../socket");
 const isAuth = require("../middlewares/is-auth");
 const Product = require("../models/Product");
 const ProductHistory = require("../models/ProductHistory");
@@ -13,6 +13,7 @@ const {
   isModuleAccessable,
   getAccessibleUsers,
   getCreatedByCondition,
+  getUsersForBroadcast,
 } = require("../utils/permission-helpers");
 const {
   getAllHandler,
@@ -24,6 +25,7 @@ router
   .route("/")
   .post(isAuth, async (req, res) => {
     try {
+      const io = socketio.getIO();
       if (!req.role.superadmin) {
         let accessable = await isModuleAccessable("Product", "r", req);
         if (!accessable) {
@@ -108,6 +110,14 @@ router
         message: "Product created successfully",
         data: product,
       });
+      const rooms = await getUsersForBroadcast(
+        req.tokenData.id,
+        "r",
+        req.tokenData.id
+      );
+      if (rooms.length) {
+        io.to(rooms).emit("Product:create", product);
+      }
     } catch (err) {
       console.log(err);
       res.status(500).json({
@@ -243,6 +253,7 @@ router
   })
   .put(isAuth, getProductById, async (req, res) => {
     try {
+      const io = socketio.getIO();
       const product = req.data;
       let createdby = null;
       if (!req.role.superadmin) {
@@ -357,6 +368,12 @@ router
         message: "Product updated successfully",
         data: product,
       });
+      const rooms = await getUsersForBroadcast(
+        product.createdby,
+        "r",
+        req.tokenData.id
+      );
+      io.to(rooms).emit("Product:update", product);
     } catch (err) {
       console.log(err);
       res.status(500).json({
@@ -367,6 +384,7 @@ router
   })
   .delete(isAuth, getProductById, async (req, res) => {
     try {
+      const io = socketio.getIO();
       const product = req.data;
       let createdby = null;
       if (!req.role.superadmin) {
@@ -414,6 +432,14 @@ router
         message: "Product deleted successfully",
         data: product,
       });
+      const rooms = await getUsersForBroadcast(
+        product.createdby,
+        "r",
+        req.tokenData.id
+      );
+      if (rooms.length) {
+        io.to(rooms).emit("Product:delete", product);
+      }
     } catch (err) {
       console.log(err);
       res.status(500).json({

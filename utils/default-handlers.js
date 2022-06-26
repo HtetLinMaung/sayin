@@ -1,8 +1,10 @@
 const {
   isModuleAccessable,
   getAccessibleUsers,
+  getUsersForBroadcast,
 } = require("./permission-helpers");
 const { getMongooseFindOptions } = require("./query-helpers");
+const socketio = require("../socket");
 
 exports.getAllHandler = (Model, option) => async (req, res) => {
   try {
@@ -54,6 +56,7 @@ exports.getAllHandler = (Model, option) => async (req, res) => {
 
 exports.createHandler = (Model, option) => async (req, res) => {
   try {
+    const io = socketio.getIO();
     if (!req.role.superadmin) {
       const accessable = await isModuleAccessable(option.moduleName, "c", req);
       if (!accessable) {
@@ -77,6 +80,14 @@ exports.createHandler = (Model, option) => async (req, res) => {
       message: option.message,
       data,
     });
+    const rooms = await getUsersForBroadcast(
+      req.tokenData.id,
+      "r",
+      req.tokenData.id
+    );
+    if (rooms.length) {
+      io.to(rooms).emit(`${option.moduleName}:create`, data);
+    }
   } catch (err) {
     console.log(err);
     res.code(500).json({
@@ -131,6 +142,7 @@ exports.getByIdMiddleware = (Model, option) => async (req, res, next) => {
 
 exports.updateHandler = (option) => async (req, res) => {
   try {
+    const io = socketio.getIO();
     const data = req.data;
     if (!req.role.superadmin) {
       const accessable = await isModuleAccessable(option.moduleName, "u", req);
@@ -166,6 +178,14 @@ exports.updateHandler = (option) => async (req, res) => {
       message: option.message,
       data,
     });
+    const rooms = await getUsersForBroadcast(
+      data.createdby,
+      "r",
+      req.tokenData.id
+    );
+    if (rooms.length) {
+      io.to(rooms).emit(`${option.moduleName}:update`, data);
+    }
   } catch (err) {
     console.log(err);
     res.status(500).json({
@@ -177,6 +197,7 @@ exports.updateHandler = (option) => async (req, res) => {
 
 exports.deleteHandler = (option) => async (req, res) => {
   try {
+    const io = socketio.getIO();
     const data = req.data;
     if (!req.role.superadmin) {
       const accessable = await isModuleAccessable(option.moduleName, "d", req);
@@ -199,6 +220,14 @@ exports.deleteHandler = (option) => async (req, res) => {
       message: option.message,
       data,
     });
+    const rooms = await getUsersForBroadcast(
+      data.createdby,
+      "r",
+      req.tokenData.id
+    );
+    if (rooms.length) {
+      io.to(rooms).emit(`${option.moduleName}:delete`, data);
+    }
   } catch (err) {
     console.log(err);
     res.status(500).json({

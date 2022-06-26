@@ -10,6 +10,27 @@ const roleSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    tableheaders: [
+      {
+        module: {
+          type: Schema.Types.ObjectId,
+          ref: "Module",
+          required: true,
+        },
+        headers: [
+          {
+            key: {
+              type: String,
+              required: true,
+            },
+            title: {
+              type: String,
+              required: true,
+            },
+          },
+        ],
+      },
+    ],
     modulepermissions: [
       {
         module: {

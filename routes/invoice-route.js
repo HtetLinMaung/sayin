@@ -11,6 +11,8 @@ const fs = require("fs");
 const path = require("path");
 const moment = require("moment");
 const mongoose = require("mongoose");
+const socketio = require("../socket");
+const { getUsersForBroadcast } = require("../utils/permission-helpers");
 
 const router = express.Router();
 
@@ -116,6 +118,7 @@ router
   .route("/")
   .post(isAuth, async (req, res) => {
     try {
+      const io = socketio.getIO();
       const { items, paymentmethod, tax, discount } = req.body;
 
       const invoiceid = await generateSequence("invoiceid");
@@ -172,7 +175,16 @@ router
       res.status(201).json({
         code: 201,
         message: "Invoice created successfully",
+        data: invoice,
       });
+      const rooms = await getUsersForBroadcast(
+        invoice.createdby,
+        "r",
+        req.tokenData.id
+      );
+      if (rooms.length) {
+        io.to(rooms).emit("Invoice:create", invoice);
+      }
     } catch (err) {
       console.log(err);
       res.status(500).json({

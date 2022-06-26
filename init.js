@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const fs = require("fs");
+const ActiveUser = require("./models/ActiveUser");
 // const Category = require("./models/Category");
 const Module = require("./models/Module");
 // const Product = require("./models/Product");
@@ -71,6 +72,8 @@ const init = async () => {
   //   category.products = productIds;
   //   await category.save();
   // }
+
+  await ActiveUser.deleteMany();
 
   let sequence = await Sequence.findOne({
     key: "invoiceid",
