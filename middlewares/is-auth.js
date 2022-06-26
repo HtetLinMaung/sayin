@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
-const isAuth = (req, res, next) => {
+const isAuth = async (req, res, next) => {
   const authHeader = req.get("Authorization");
   if (!authHeader) {
     return res.status(419).json({
@@ -27,6 +28,15 @@ const isAuth = (req, res, next) => {
     });
   }
 
+  req.tokenData = decodedToken;
+  const user = await User.findOne(
+    {
+      status: 1,
+      _id: decodedToken.id,
+    },
+    { role: 1 }
+  ).populate("role");
+  req.role = user.role;
   req.tokenData = decodedToken;
   next();
 };

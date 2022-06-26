@@ -19,6 +19,15 @@ const userSchema = new Schema(
       type: String,
       required: true,
     },
+    role: {
+      type: Schema.Types.ObjectId,
+      required: true,
+      ref: "Role",
+    },
+    createdby: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
     status: {
       type: Number,
       default: 1,
@@ -26,5 +35,7 @@ const userSchema = new Schema(
   },
   { timestamps: true }
 );
+
+userSchema.index({ "$**": "text" });
 
 module.exports = model("User", userSchema);

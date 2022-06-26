@@ -8,12 +8,56 @@ const moment = require("moment");
 const isAuth = require("../middlewares/is-auth");
 const Product = require("../models/Product");
 const ProductHistory = require("../models/ProductHistory");
+const Category = require("../models/Category");
+const {
+  isModuleAccessable,
+  getAccessibleUsers,
+  getCreatedByCondition,
+} = require("../utils/permission-helpers");
+const {
+  getAllHandler,
+  getByIdMiddleware,
+} = require("../utils/default-handlers");
 const router = express.Router();
 
 router
   .route("/")
   .post(isAuth, async (req, res) => {
     try {
+      if (!req.role.superadmin) {
+        let accessable = await isModuleAccessable("Product", "r", req);
+        if (!accessable) {
+          return res.status(403).json({
+            code: 403,
+            message: "You are not authorized to perform this action",
+          });
+        }
+
+        accessable = await isModuleAccessable("Product", "c", req);
+        if (!accessable) {
+          return res.status(403).json({
+            code: 403,
+            message: "You are not authorized to perform this action",
+          });
+        }
+
+        accessable = await isModuleAccessable("Category", "r", req);
+        if (!accessable) {
+          return res.status(403).json({
+            code: 403,
+            message: "You are not authorized to perform this action",
+          });
+        }
+
+        accessable = await isModuleAccessable("Category", "u", req);
+        if (!accessable) {
+          return res.status(403).json({
+            code: 403,
+            message: "You are not authorized to perform this action",
+          });
+        }
+      }
+
       let product = await Product.findOne({
         code: req.body.code,
         status: 1,
@@ -48,6 +92,15 @@ router
       });
       productHistory.save();
 
+      for (const categoryId of req.body.categories) {
+        const category = await Category.findOne({
+          _id: categoryId,
+          status: 1,
+        });
+        category.products.push(product._id);
+        await category.save();
+      }
+
       res.status(201).json({
         code: 201,
         message: "Product created successfully",
@@ -61,70 +114,14 @@ router
       });
     }
   })
-  .get(isAuth, async (req, res) => {
-    try {
-      const { search, page, perpage, fromdate, todate, sort } = req.query;
-
-      const query = {
-        status: 1,
-        createdby: req.tokenData.id,
-      };
-
-      if (search) {
-        query["$text"] = {
-          $search: search,
-        };
-      }
-
-      if (fromdate && !todate) {
-        query["createdAt"] = {
-          $gte: moment(fromdate).toDate(),
-        };
-      } else if (fromdate && todate) {
-        query["createdAt"] = {
-          $gte: moment(fromdate).toDate(),
-          $lt: moment(todate).add(1, "days").toDate(),
-        };
-      } else if (todate && !fromdate) {
-        query["createdAt"] = {
-          $lt: moment(todate).add(1, "days").toDate(),
-        };
-      }
-
-      const sortArg = {};
-      if (sort) {
-        for (const item of sort.split(",")) {
-          const [key, value] = item.split(":");
-          sortArg[key] = value;
-        }
-      }
-
-      const offset = (parseInt(page) - 1) * parseInt(perpage);
-
-      const products = await Product.find(query)
-        .sort(sortArg)
-        .skip(offset)
-        .limit(perpage);
-
-      const total = await Product.find(query).countDocuments();
-
-      res.json({
-        code: 200,
-        message: "Products fetched successfully",
-        data: products,
-        total,
-        page: parseInt(page),
-        perpage: parseInt(perpage),
-        pagecount: Math.ceil(total / perpage),
-      });
-    } catch (err) {
-      console.log(err);
-      res.status(500).json({
-        code: 500,
-        message: err.message,
-      });
-    }
-  });
+  .get(
+    isAuth,
+    getAllHandler(Product, {
+      moduleName: "Product",
+      message: "Products fetched successfully",
+      populate: { path: "createdby", select: "name" },
+    })
+  );
 
 router.get("/export", async (req, res) => {
   try {
@@ -228,75 +225,82 @@ router.get("/export", async (req, res) => {
   }
 });
 
+const getProductById = getByIdMiddleware(Product, {
+  moduleName: "Product",
+  message: "Product not found",
+});
+
 router
   .route("/:id")
-  .get(isAuth, async (req, res) => {
-    try {
-      const product = await Product.findOne({
-        status: 1,
-        _id: req.params.id,
-      });
-
-      if (!product) {
-        res.json({
-          code: 404,
-          message: "Product not found",
-        });
-      }
-
-      if (product.createdby != req.tokenData.id) {
-        res.json({
-          code: 401,
-          message: "Not authorized",
-        });
-      }
-
-      res.json({
-        code: 200,
-        message: "Product fetched successfully",
-        data: product,
-      });
-    } catch (err) {
-      console.log(err);
-      res.status(500).json({
-        code: 500,
-        message: err.message,
-      });
-    }
+  .get(isAuth, getProductById, async (req, res) => {
+    res.json({
+      code: 200,
+      message: "Product fetched successfully",
+      data: req.data,
+    });
   })
-  .put(isAuth, async (req, res) => {
+  .put(isAuth, getProductById, async (req, res) => {
     try {
-      const product = await Product.findOne({
+      const product = req.data;
+      let createdby = null;
+      if (!req.role.superadmin) {
+        createdby = getCreatedByCondition(req);
+        let accessable = await isModuleAccessable("Product", "u", req);
+        if (
+          !accessable ||
+          !getAccessibleUsers("u", req).includes(req.data.createdby)
+        ) {
+          return res.status(403).json({
+            code: 403,
+            message: "You are not authorized to perform this action",
+          });
+        }
+
+        accessable = await isModuleAccessable("Category", "r", req);
+        if (!accessable) {
+          return res.status(403).json({
+            code: 403,
+            message: "You are not authorized to perform this action",
+          });
+        }
+
+        accessable = await isModuleAccessable("Category", "u", req);
+        if (!accessable) {
+          return res.status(403).json({
+            code: 403,
+            message: "You are not authorized to perform this action",
+          });
+        }
+      }
+
+      let query = {
+        code: req.body.code,
         status: 1,
-        _id: req.params.id,
-      });
-
-      if (!product) {
-        res.json({
-          code: 404,
-          message: "Product not found",
-        });
-      }
-
-      if (product.createdby != req.tokenData.id) {
-        res.json({
-          code: 401,
-          message: "Not authorized",
-        });
-      }
-
+      };
       if (product.code != req.body.code) {
-        const productExists = await Product.findOne({
-          code: req.body.code,
-          status: 1,
-          createdby: req.tokenData.id,
-        });
+        if (createdby) {
+          query["createdby"] = createdby;
+        }
+        const productExists = await Product.findOne(query);
         if (productExists) {
           return res.status(409).json({
             code: 409,
             message: "Product's code already exists",
           });
         }
+      }
+
+      for (const categoryId of product.categories) {
+        query = {
+          _id: categoryId,
+          status: 1,
+        };
+        if (createdby) {
+          query["createdby"] = createdby;
+        }
+        const category = await Category.findOne(query);
+        category.products = category.products.filter((id) => id != product._id);
+        await category.save();
       }
 
       if (req.body.image.startsWith("data:image")) {
@@ -307,14 +311,38 @@ router
         fs.writeFileSync(filePath, buffer);
         req.body.image = `/${fileName}`;
       }
-      product.set(req.body);
+
+      const history = {};
+      for (const [key, value] of Object.entries(req.body)) {
+        if (
+          !["_id", "createdby", "createdAt", "updatedAt", "status"].includes(
+            key
+          )
+        ) {
+          product[key] = value;
+          history[key] = value;
+        }
+      }
       await product.save();
 
       const productHistory = new ProductHistory({
-        ...req.body,
+        ...history,
         updatedby: req.tokenData.id,
       });
       productHistory.save();
+
+      for (const categoryId of req.body.categories) {
+        query = {
+          _id: categoryId,
+          status: 1,
+        };
+        if (createdby) {
+          query["createdby"] = createdby;
+        }
+        const category = await Category.findOne(query);
+        category.products.push(product._id);
+        await category.save();
+      }
 
       res.json({
         code: 200,
@@ -329,25 +357,20 @@ router
       });
     }
   })
-  .delete(isAuth, async (req, res) => {
+  .delete(isAuth, getProductById, async (req, res) => {
     try {
-      const product = await Product.findOne({
-        status: 1,
-        _id: req.params.id,
-      });
-
-      if (!product) {
-        res.json({
-          code: 404,
-          message: "Product not found",
-        });
-      }
-
-      if (product.createdby != req.tokenData.id) {
-        res.json({
-          code: 401,
-          message: "Not authorized",
-        });
+      const product = req.data;
+      if (!req.role.superadmin) {
+        const accessable = await isModuleAccessable("Product", "d", req);
+        if (
+          !accessable ||
+          !getAccessibleUsers("d", req).includes(req.data.createdby)
+        ) {
+          return res.status(403).json({
+            code: 403,
+            message: "You are not authorized to perform this action",
+          });
+        }
       }
 
       product.status = 0;

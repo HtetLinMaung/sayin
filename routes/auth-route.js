@@ -56,41 +56,41 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.post("/register", async (req, res) => {
-  try {
-    const { name, userid, password } = req.body;
+// router.post("/register", async (req, res) => {
+//   try {
+//     const { name, userid, password } = req.body;
 
-    const user = await User.findOne({
-      userid,
-      status: 1,
-    });
+//     const user = await User.findOne({
+//       userid,
+//       status: 1,
+//     });
 
-    if (user) {
-      res.json({
-        code: 400,
-        message: "User already exists",
-      });
-    }
+//     if (user) {
+//       res.json({
+//         code: 400,
+//         message: "User already exists",
+//       });
+//     }
 
-    const newUser = new User({
-      name,
-      userid,
-      password: bcrypt.hashSync(password, 12),
-    });
-    await newUser.save();
+//     const newUser = new User({
+//       name,
+//       userid,
+//       password: bcrypt.hashSync(password, 12),
+//     });
+//     await newUser.save();
 
-    res.json({
-      code: 200,
-      message: "User created successfully",
-      data: newUser,
-    });
-  } catch (err) {
-    console.log(err);
-    res.json({
-      code: 500,
-      message: err.message,
-    });
-  }
-});
+//     res.json({
+//       code: 200,
+//       message: "User created successfully",
+//       data: newUser,
+//     });
+//   } catch (err) {
+//     console.log(err);
+//     res.json({
+//       code: 500,
+//       message: err.message,
+//     });
+//   }
+// });
 
 module.exports = router;

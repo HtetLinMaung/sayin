@@ -34,6 +34,12 @@ const productSchema = new Schema(
       type: Number,
       default: 0,
     },
+    categories: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Category",
+      },
+    ],
     status: {
       type: Number,
       default: 1,

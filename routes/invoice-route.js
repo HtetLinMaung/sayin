@@ -262,7 +262,11 @@ router
 
 router.route("/:id").get(isAuth, async (req, res) => {
   try {
-    const invoice = await Invoice.findById(req.params.id);
+    const invoice = await Invoice.findOne({
+      _id: req.params.id,
+      status: 1,
+      createdby: req.tokenData.id,
+    });
 
     if (!invoice) {
       return res.status(404).json({
