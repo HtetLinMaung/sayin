@@ -97,8 +97,10 @@ router
           _id: categoryId,
           status: 1,
         });
-        category.products.push(product._id);
-        await category.save();
+        if (category) {
+          category.products.push(product._id);
+          await category.save();
+        }
       }
 
       res.status(201).json({
