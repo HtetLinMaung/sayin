@@ -1,8 +1,8 @@
 const bcrypt = require("bcryptjs");
 const fs = require("fs");
-const Category = require("./models/Category");
+// const Category = require("./models/Category");
 const Module = require("./models/Module");
-const Product = require("./models/Product");
+// const Product = require("./models/Product");
 const Role = require("./models/Role");
 const Sequence = require("./models/Sequence");
 
