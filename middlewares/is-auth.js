@@ -28,7 +28,6 @@ const isAuth = async (req, res, next) => {
     });
   }
 
-  req.tokenData = decodedToken;
   const user = await User.findOne(
     {
       status: 1,
@@ -38,6 +37,7 @@ const isAuth = async (req, res, next) => {
   ).populate("role");
   req.role = user.role;
   req.tokenData = decodedToken;
+  console.log(decodedToken);
   next();
 };
 

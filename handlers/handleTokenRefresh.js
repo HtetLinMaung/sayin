@@ -9,7 +9,7 @@ module.exports = (io) => {
         for (const { user } of activeUsers) {
           const token = jwt.sign(
             {
-              id: user,
+              id: user._id,
             },
             process.env.JWT_SECRET,
             {
