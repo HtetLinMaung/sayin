@@ -8,6 +8,7 @@ const incomingLog = require("./middlewares/incoming-log");
 const handleSubscribe = require("./handlers/handleSubscribe");
 const handleDisconnect = require("./handlers/handleDisconnect");
 const handleTokenRefresh = require("./handlers/handleTokenRefresh");
+const { log } = require("./utils/logger");
 
 console["error"] = function () {};
 
@@ -32,10 +33,12 @@ app.use("/sayin/users", require("./routes/user-route"));
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
-    const server = app.listen(PORT, () =>
-      console.log(`Listening on port ${PORT}`)
-    );
-    init();
+    log("mongodb connected");
+    const server = app.listen(PORT, () => {
+      log(`Listening on port ${PORT}`);
+      init();
+    });
+
     const io = socketio.init(server, {
       cors: {
         origin: "*",
@@ -50,10 +53,10 @@ mongoose
     handleTokenRefresh(io);
 
     io.engine.on("connection_error", (err) => {
-      console.log(err.req); // the request object
-      console.log(err.code); // the error code, for example 1
-      console.log(err.message); // the error message, for example "Session ID unknown"
-      console.log(err.context); // some additional error context
+      log(err.req); // the request object
+      log(err.code); // the error code, for example 1
+      log(err.message); // the error message, for example "Session ID unknown"
+      log(err.context); // some additional error context
     });
   })
-  .catch(console.log);
+  .catch(log);

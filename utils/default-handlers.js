@@ -5,6 +5,7 @@ const {
 } = require("./permission-helpers");
 const { getMongooseFindOptions } = require("./query-helpers");
 const socketio = require("../socket");
+const { log } = require("./logger");
 
 exports.getAllHandler = (Model, option) => async (req, res) => {
   try {
@@ -32,7 +33,18 @@ exports.getAllHandler = (Model, option) => async (req, res) => {
       pagecount = Math.ceil(total / perpage);
     }
     if ("populate" in option) {
-      cursor = cursor.populate(option.populate);
+      if (
+        !Array.isArray(option.populate) &&
+        typeof option.populate != "string" &&
+        option.populate.path == "createdby"
+      ) {
+        option.populate["options"] = {
+          sort: [{ name: sortArg["creatername"] }],
+        };
+        cursor = cursor.populate(option.populate);
+      } else {
+        cursor = cursor.populate(option.populate);
+      }
     }
     data = await cursor.exec();
 
@@ -46,7 +58,7 @@ exports.getAllHandler = (Model, option) => async (req, res) => {
       pagecount,
     });
   } catch (err) {
-    console.log(err);
+    log(err, "error");
     res.status(500).json({
       code: 500,
       message: err.message,
@@ -89,7 +101,7 @@ exports.createHandler = (Model, option) => async (req, res) => {
       io.to(rooms).emit(`${option.moduleName}:create`, data);
     }
   } catch (err) {
-    console.log(err);
+    log(err, "error");
     res.code(500).json({
       code: 500,
       message: err.message,
@@ -132,7 +144,7 @@ exports.getByIdMiddleware = (Model, option) => async (req, res, next) => {
     req.data = data;
     next();
   } catch (err) {
-    console.log(err);
+    log(err, "error");
     res.status(500).json({
       code: 500,
       message: err.message,
@@ -187,7 +199,7 @@ exports.updateHandler = (option) => async (req, res) => {
       io.to(rooms).emit(`${option.moduleName}:update`, data);
     }
   } catch (err) {
-    console.log(err);
+    log(err, "error");
     res.status(500).json({
       code: 500,
       message: err.message,
@@ -229,7 +241,7 @@ exports.deleteHandler = (option) => async (req, res) => {
       io.to(rooms).emit(`${option.moduleName}:delete`, data);
     }
   } catch (err) {
-    console.log(err);
+    log(err, "error");
     res.status(500).json({
       code: 500,
       message: err.message,

@@ -2,6 +2,9 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { log } = require("../utils/logger");
+const Role = require("../models/Role");
+const isAuth = require("../middlewares/is-auth");
 
 const router = express.Router();
 
@@ -48,7 +51,37 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (err) {
-    console.log(err);
+    log(err, "error");
+    res.code(500).json({
+      code: 500,
+      message: err.message,
+    });
+  }
+});
+
+router.get("/module-permissions", isAuth, async (req, res) => {
+  try {
+    const role = await Role.findOne({
+      _id: req.role._id,
+      status: 1,
+    }).populate([
+      { path: "modulepermissions.module", select: "name -_id" },
+      { path: "modulepermissions.tableheaders", select: "-_id key title" },
+    ]);
+    if (!role) {
+      return res.status(401).json({
+        code: 401,
+        message: "Unauthorized",
+      });
+    }
+
+    res.json({
+      code: 200,
+      message: "Module permissions fetched successfully",
+      data: role.modulepermissions,
+    });
+  } catch (err) {
+    log(err, "error");
     res.code(500).json({
       code: 500,
       message: err.message,

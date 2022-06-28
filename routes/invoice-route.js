@@ -10,9 +10,12 @@ const ExcelJS = require("exceljs");
 const fs = require("fs");
 const path = require("path");
 const moment = require("moment");
-const mongoose = require("mongoose");
 const socketio = require("../socket");
-const { getUsersForBroadcast } = require("../utils/permission-helpers");
+const {
+  getUsersForBroadcast,
+  isModuleAccessable,
+} = require("../utils/permission-helpers");
+const { getMongooseFindOptions } = require("../utils/query-helpers");
 
 const router = express.Router();
 
@@ -195,50 +198,39 @@ router
   })
   .get(isAuth, async (req, res) => {
     try {
-      const { search, page, perpage, fromdate, todate, sort } = req.query;
-
-      const query = {
-        status: 1,
-        createdby: new mongoose.Types.ObjectId(req.tokenData.id),
-      };
-
-      if (search) {
-        query["$text"] = {
-          $search: search,
-        };
-      }
-
-      if (fromdate && !todate) {
-        query["createdAt"] = {
-          $gte: moment(fromdate).toDate(),
-        };
-      } else if (fromdate && todate) {
-        query["createdAt"] = {
-          $gte: moment(fromdate).toDate(),
-          $lt: moment(todate).add(1, "days").toDate(),
-        };
-      } else if (todate && !fromdate) {
-        query["createdAt"] = {
-          $lt: moment(todate).add(1, "days").toDate(),
-        };
-      }
-
-      const sortArg = {};
-      if (sort) {
-        for (const item of sort.split(",")) {
-          const [key, value] = item.split(":");
-          sortArg[key] = value;
+      if (!req.role.superadmin) {
+        const accessable = await isModuleAccessable("Invoice", "r", req);
+        if (!accessable) {
+          return res.status(403).json({
+            code: 403,
+            message: "You are not authorized to perform this action",
+          });
         }
       }
 
-      const offset = (parseInt(page) - 1) * parseInt(perpage);
+      const { query, sortArg, offset, page, perpage } =
+        getMongooseFindOptions(req);
 
-      const data = await Invoice.find(query)
-        .sort(sortArg)
-        .skip(offset)
-        .limit(perpage);
+      let data = [];
+      let cursor = Invoice.find(query).sort(sortArg);
 
-      const total = await Invoice.find(query).countDocuments();
+      let total = 0;
+      let pagecount = 0;
+      if (page && perpage) {
+        cursor = cursor.skip(offset).limit(perpage);
+        total = await Invoice.find(query).countDocuments();
+        pagecount = Math.ceil(total / perpage);
+      }
+
+      cursor = cursor.populate({
+        path: "createdby",
+        select: "name",
+        options: {
+          sort: [{ name: sortArg["creatername"] }],
+        },
+      });
+      data = await cursor.exec();
+
       const aggregate = await Invoice.aggregate([
         {
           $match: query,
@@ -256,9 +248,9 @@ router
         message: "Invoices fetched successfully",
         data,
         total,
-        page: parseInt(page),
-        perpage: parseInt(perpage),
-        pagecount: Math.ceil(total / perpage),
+        page,
+        perpage,
+        pagecount,
         grandtotal: aggregate.length
           ? money.default.format(aggregate[0].grandtotal)
           : "0.00",

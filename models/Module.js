@@ -7,6 +7,12 @@ const moduleSchema = new Schema(
       type: String,
       required: true,
     },
+    tableheaders: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "TableHeader",
+      },
+    ],
     status: {
       type: Number,
       default: 1,

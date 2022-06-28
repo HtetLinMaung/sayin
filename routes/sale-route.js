@@ -12,6 +12,11 @@ const path = require("path");
 const generateSequence = require("../utils/generate-sequence");
 const router = express.Router();
 const moment = require("moment");
+const { getMongooseFindOptions } = require("../utils/query-helpers");
+const {
+  isModuleAccessable,
+  getCreatedByCondition,
+} = require("../utils/permission-helpers");
 
 router.get("/export", async (req, res) => {
   try {
@@ -254,26 +259,40 @@ router.post("/import", isAuth, async (req, res) => {
 
 router.route("/").get(isAuth, async (req, res) => {
   try {
-    const { search, page, perpage, invoiceid, fromdate, todate, sort } =
-      req.query;
+    if (!req.role.superadmin) {
+      const accessable = await isModuleAccessable("Sale", "r", req);
+      if (!accessable) {
+        return res.status(403).json({
+          code: 403,
+          message: "You are not authorized to perform this action",
+        });
+      }
+    }
 
-    const query = {
-      status: 1,
-      createdby: new mongoose.Types.ObjectId(req.tokenData.id),
-    };
+    const { query, sortArg, offset, page, perpage } = getMongooseFindOptions(
+      req,
+      { fulltextsearch: false }
+    );
+
+    const { search, invoiceid } = req.query;
+
+    let createdby = null;
+    if (req.role.superadmin) {
+      createdby = getCreatedByCondition(req);
+    }
 
     if (search) {
       query["$or"] = [];
-      const products = await Product.find(
-        {
-          status: 1,
-          $text: {
-            $search: search,
-          },
-          createdby: new mongoose.Types.ObjectId(req.tokenData.id),
+      const searchQuery = {
+        status: 1,
+        $text: {
+          $search: search,
         },
-        { _id: 1 }
-      );
+      };
+      if (createdby) {
+        searchQuery["createdby"] = createdby;
+      }
+      const products = await Product.find(searchQuery, { _id: 1 });
       if (products.length) {
         query["$or"].push({
           product: {
@@ -284,16 +303,7 @@ router.route("/").get(isAuth, async (req, res) => {
         });
       }
 
-      const invoices = await Invoice.find(
-        {
-          status: 1,
-          $text: {
-            $search: search,
-          },
-          createdby: new mongoose.Types.ObjectId(req.tokenData.id),
-        },
-        { _id: 1 }
-      );
+      const invoices = await Invoice.find(searchQuery, { _id: 1 });
       if (invoices.length) {
         query["$or"].push({
           invoice: {
@@ -310,49 +320,50 @@ router.route("/").get(isAuth, async (req, res) => {
     }
 
     if (invoiceid) {
-      const invoice = await Invoice.findOne({
+      let invoiceQuery = {
         invoiceid,
         status: 1,
-        createdby: new mongoose.Types.ObjectId(req.tokenData.id),
-      });
+      };
+      if (createdby) {
+        invoiceQuery["createdby"] = createdby;
+      }
+      const invoice = await Invoice.findOne(invoiceQuery);
       query["invoice"] = null;
       if (invoice) {
         query["invoice"] = new mongoose.Types.ObjectId(invoice._id);
       }
     }
 
-    if (fromdate && !todate) {
-      query["createdAt"] = {
-        $gte: moment(fromdate).toDate(),
-      };
-    } else if (fromdate && todate) {
-      query["createdAt"] = {
-        $gte: moment(fromdate).toDate(),
-        $lt: moment(todate).add(1, "days").toDate(),
-      };
-    } else if (todate && !fromdate) {
-      query["createdAt"] = {
-        $lt: moment(todate).add(1, "days").toDate(),
-      };
+    let data = [];
+    let cursor = Sale.find(query).sort(sortArg);
+
+    let total = 0;
+    let pagecount = 0;
+    if (page && perpage) {
+      cursor = cursor.skip(offset).limit(perpage);
+      total = await Sale.find(query).countDocuments();
+      pagecount = Math.ceil(total / perpage);
     }
 
-    const sortArg = {};
-    if (sort) {
-      for (const item of sort.split(",")) {
-        const [key, value] = item.split(":");
-        sortArg[key] = value;
-      }
-    }
+    cursor = cursor.populate([
+      {
+        path: "product",
+        select: "name code",
+      },
+      {
+        path: "invoice",
+        select: "invoiceid",
+      },
+      {
+        path: "createdby",
+        select: "name",
+        options: {
+          sort: [{ name: sortArg["creatername"] }],
+        },
+      },
+    ]);
+    data = await cursor.exec();
 
-    const offset = (parseInt(page) - 1) * parseInt(perpage);
-
-    const data = await Sale.find(query)
-      .sort(sortArg)
-      .skip(offset)
-      .limit(perpage)
-      .populate(["product", "invoice"]);
-
-    const total = await Sale.find(query).countDocuments();
     const aggregate = await Sale.aggregate([
       {
         $match: query,
@@ -378,9 +389,9 @@ router.route("/").get(isAuth, async (req, res) => {
         amount: money.default.format(d.amount),
       })),
       total,
-      page: parseInt(page),
-      perpage: parseInt(perpage),
-      pagecount: Math.ceil(total / perpage),
+      page,
+      perpage,
+      pagecount,
       totalqty: aggregate.length ? aggregate[0].totalqty : 0,
       totalamount: aggregate.length
         ? money.default.format(aggregate[0].totalamount)
