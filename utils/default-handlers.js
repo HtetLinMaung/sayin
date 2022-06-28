@@ -38,9 +38,11 @@ exports.getAllHandler = (Model, option) => async (req, res) => {
         typeof option.populate != "string" &&
         option.populate.path == "createdby"
       ) {
-        option.populate["options"] = {
-          sort: [{ name: sortArg["creatername"] }],
-        };
+        if ("creatername" in sortArg) {
+          option.populate["options"] = {
+            sort: [{ name: sortArg["creatername"] }],
+          };
+        }
         cursor = cursor.populate(option.populate);
       } else {
         cursor = cursor.populate(option.populate);

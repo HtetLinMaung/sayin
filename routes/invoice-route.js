@@ -222,13 +222,14 @@ router
         pagecount = Math.ceil(total / perpage);
       }
 
-      cursor = cursor.populate({
-        path: "createdby",
-        select: "name",
-        options: {
+      const populate = { path: "createdby", select: "name" };
+
+      if ("creatername" in sortArg) {
+        populate["options"] = {
           sort: [{ name: sortArg["creatername"] }],
-        },
-      });
+        };
+      }
+      cursor = cursor.populate(populate);
       data = await cursor.exec();
 
       const aggregate = await Invoice.aggregate([

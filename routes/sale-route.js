@@ -345,7 +345,7 @@ router.route("/").get(isAuth, async (req, res) => {
       pagecount = Math.ceil(total / perpage);
     }
 
-    cursor = cursor.populate([
+    const populate = [
       {
         path: "product",
         select: "name code",
@@ -354,14 +354,22 @@ router.route("/").get(isAuth, async (req, res) => {
         path: "invoice",
         select: "invoiceid",
       },
-      {
+    ];
+    if ("creatername" in sortArg) {
+      populate.push({
         path: "createdby",
         select: "name",
         options: {
           sort: [{ name: sortArg["creatername"] }],
         },
-      },
-    ]);
+      });
+    } else {
+      populate.push({
+        path: "createdby",
+        select: "name",
+      });
+    }
+    cursor = cursor.populate(populate);
     data = await cursor.exec();
 
     const aggregate = await Sale.aggregate([
